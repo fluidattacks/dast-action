@@ -1,0 +1,24 @@
+name: 'Fluid Attacks DAST'
+description: 'Run dynamic application security testing with Fluid Attacks scanner'
+author: 'Fluid Attacks'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+outputs:
+  sarif_file:
+    description: 'Path to SARIF results file (if SARIF format selected)'
+    value: ${{ steps.scan.outputs.sarif_file }}
+  vulnerabilities_found:
+    description: 'Whether vulnerabilities were found (true/false)'
+    value: ${{ steps.scan.outputs.vulnerabilities_found }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run scan
+      id: scan
+      shell: bash
+      run: |
+        bash "${{ github.action_path }}/generate-config.sh"
