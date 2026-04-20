@@ -44,8 +44,8 @@ run_scan() {
   docker run --rm \
     -v "${GITHUB_WORKSPACE}:/src" \
     -v "${CONFIG_FILE}:${CONFIG_FILE}:ro" \
-    "docker.io/fluidattacks/dast:latest" \
-    ss scan --config "${CONFIG_FILE}" || exit_code=$?
+    "ghcr.io/fluidattacks/dast:latest" \
+    dast scan --config "${CONFIG_FILE}" || exit_code=$?
 
   if [[ ${exit_code} -eq 0 ]]; then
     echo "vulnerabilities_found=false" >> "${GITHUB_OUTPUT}"
