@@ -70,19 +70,11 @@ After the workflow runs, results are written to `.fa-dast-results.sarif` (or wha
 
 The raw SARIF file is always available in your workspace. You can download it as an artifact, process it with other tools, or upload it to a third-party platform.
 
-### GitHub Security tab (optional)
+### GitHub Security tab
 
-You can upload the SARIF file to GitHub's Security tab so findings appear as **Code scanning alerts** with inline PR annotations:
+DAST results cannot be uploaded to the GitHub Security tab. GitHub's Code Scanning feature requires findings to reference specific file paths and line numbers, but DAST vulnerabilities point to URLs and endpoints — there are no source file locations to annotate.
 
-```yaml
-- name: Upload results to GitHub Security tab
-  if: always()
-  uses: github/codeql-action/upload-sarif@v4
-  with:
-    sarif_file: ${{ steps.scan.outputs.sarif_file }}
-```
-
-> **Restrictions:** SARIF upload to the Security tab requires **GitHub Advanced Security**, which is available on all public repositories and on private repositories under a GitHub Advanced Security license. On private repositories without that license, the upload step will fail. See [GitHub's documentation](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github) for details.
+To review findings, download the SARIF file as a workflow artifact or export results as CSV.
 
 ## Configuration
 
@@ -111,7 +103,7 @@ You can use these outputs in subsequent workflow steps. For example:
 ```yaml
 - name: Comment on PR
   if: steps.scan.outputs.vulnerabilities_found == 'true'
-  run: echo "Vulnerabilities were found. Check the Security tab for details."
+  run: echo "Vulnerabilities were found. Download the SARIF artifact for details."
 ```
 
 ## Common scenarios
@@ -126,9 +118,9 @@ output:
 
 ## Troubleshooting
 
-### The scan runs but no results appear in the Security tab
+### Where do I view the results?
 
-Make sure the "Upload SARIF" step is included in your workflow and uses `if: always()` so it runs even if the scan finds vulnerabilities.
+Download the SARIF file from the workflow run's **Artifacts** section, or set `output.format: CSV` to get a CSV report. DAST findings cannot be uploaded to the GitHub Security tab because they reference URLs, not source file locations.
 
 ## More information
 
