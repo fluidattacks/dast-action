@@ -45,7 +45,7 @@ run_scan() {
     -v "${GITHUB_WORKSPACE}:/src" \
     -v "${CONFIG_FILE}:${CONFIG_FILE}:ro" \
     "ghcr.io/fluidattacks/dast:latest" \
-    dast scan --config "${CONFIG_FILE}" || exit_code=$?
+    dast scan "${CONFIG_FILE}" || exit_code=$?
 
   if [[ ${exit_code} -eq 0 ]]; then
     echo "vulnerabilities_found=false" >> "${GITHUB_OUTPUT}"
