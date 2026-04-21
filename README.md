@@ -2,31 +2,27 @@
 
 Free, open-source dynamic application security testing (DAST) action for your GitHub repositories. No account, API key, or registration required.
 
-## Quick Start (2 minutes)
+## Quick Start
 
 ### 1. Create the configuration file
 
-Add a file called `.fluidattacks.yaml` in the root of your repository:
+Create a YAML configuration file anywhere in your repository. For example, `.github/dast-config.yaml`:
 
 ```yaml
 language: EN
-strict: true
+strict: false
 output:
-  file_path: results.sarif
+  file_path: results-dast.sarif
   format: SARIF
 dast:
   urls:
-    - url: https://www.myincredibleapp.com
+    - url: https://www.myapp.com
+    - url: https://www.myapp.com/api
 ```
-
-If you already have a `.fluidattacks.yaml` file in your repo, it works.
-You only need to add the `dast` section and the action will work with the other
-default keys.
-That's it for configuration. This minimal setup will scan your entire repository.
 
 ### 2. Create the GitHub Actions workflow
 
-Add the file `.github/workflows/fa-dast.yml` to your repository:
+Add `.github/workflows/fa-dast.yml` to your repository:
 
 ```yaml
 name: DAST
@@ -35,7 +31,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   schedule:
-    - cron: '0 8 * * 1'  # optional: weekly full scan every Monday at 8am
+    - cron: '0 8 * * 1'  # optional: weekly scan every Monday at 8am
 
 jobs:
   scan:
@@ -43,11 +39,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: fluidattacks/dast-action@main
+      - uses: fluidattacks/dast-action@<version>
         id: scan
+        with:
+          scan_config_path: .github/dast-config.yaml
 ```
 
-Commit the file, push, and the scan will run automatically. Results will be written to `.fa-dast-results.sarif` in your workspace (Or the path you configured in the `.fluidattacks.yaml`).
+Replace `<version>` with the latest release tag. Find it on the [Marketplace page](https://github.com/marketplace/actions/fluid-attacks-dast).
+
+- The target application must be publicly reachable or accessible from the runner when the workflow runs.
+
+### 3. Push and run
+
+Commit both files and push. The scan runs automatically on the next push or pull request.
 
 ## Prerequisites
 
@@ -56,29 +60,9 @@ Commit the file, push, and the scan will run automatically. Results will be writ
 - A **Linux runner** (`ubuntu-latest` or equivalent) — the action requires Docker, which is only available on Linux-hosted runners.
 - No account, token, or API key is needed. The action is 100% open source.
 
-## How it works
-
-### Scan types
-
-The action scans the url targets that you have set in your configuration file.
-
-## Viewing results
-
-After the workflow runs, results are written to `.fa-dast-results.sarif` (or whatever path you configured in `output.file_path`).
-
-### SARIF file
-
-The raw SARIF file is always available in your workspace. You can download it as an artifact, process it with other tools, or upload it to a third-party platform.
-
-### GitHub Security tab
-
-DAST results cannot be uploaded to the GitHub Security tab. GitHub's Code Scanning feature requires findings to reference specific file paths and line numbers, but DAST vulnerabilities point to URLs and endpoints — there are no source file locations to annotate.
-
-To review findings, download the SARIF file as a workflow artifact or export results as CSV.
-
 ## Configuration
 
-The action reads a `.fluidattacks.yaml` file at the root of your repository. Only the `dast`, `strict` and `output` keys are used by this action.
+The `scan_config_path` input is required. The action fails immediately if the file does not exist at the given path.
 
 ```yaml
 dast:
@@ -91,36 +75,80 @@ output:
   format: SARIF
 ```
 
+- **`language`** — language for vulnerability descriptions in the output (`EN` for English, `ES` for Spanish).
+- **`strict`** — when `false`, the scanner reports findings but does not fail the pipeline. Set to `true` to break the build on any detected vulnerability.
+- **`output.file_path`** — path where results are written. When format is `SARIF`, this path is also exposed as the `sarif_file` action output.
+- **`output.format`** — `SARIF` produces the standard format. Use `CSV` for a spreadsheet-friendly report.
+- **`dast.urls`** — list of URLs the scanner will probe. The target application must be running and reachable from the GitHub Actions runner.
+
+## Action inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `scan_config_path` | Yes | — | Path to the YAML configuration file, relative to the repository root. The job fails if the file does not exist at the given path. |
+
 ## Action outputs
 
 | Output | Description |
 |---|---|
-| `sarif_file` | Path to the SARIF results file |
+| `sarif_file` | Path to the SARIF results file (only set when `output.format` is `SARIF`) |
 | `vulnerabilities_found` | `true` if any vulnerabilities were detected, `false` otherwise |
 
-You can use these outputs in subsequent workflow steps. For example:
+You can use these outputs in subsequent workflow steps:
 
 ```yaml
 - name: Comment on PR
   if: steps.scan.outputs.vulnerabilities_found == 'true'
-  run: echo "Vulnerabilities were found. Download the SARIF artifact for details."
+  run: echo "Vulnerabilities detected — check the Security tab."
 ```
 
 ## Common scenarios
+
+### Scan a staging environment on pull requests only
+
+```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+```
+
+Point the URL in your config file to a staging environment that is deployed as part of the PR workflow.
+
+### Strict mode: block merges with vulnerabilities
+
+Set `strict: true` in your configuration file and enable **Require status checks to pass before merging** in your repository's branch protection settings.
+
+```yaml
+strict: true
+```
 
 ### Export results as CSV
 
 ```yaml
 output:
-  file_path: results.csv
+  file_path: results-dast.csv
   format: CSV
 ```
 
 ## Troubleshooting
 
-### Where do I view the results?
+### No results appear in the Security tab
 
-Download the SARIF file from the workflow run's **Artifacts** section, or set `output.format: CSV` to get a CSV report. DAST findings cannot be uploaded to the GitHub Security tab because they reference URLs, not source file locations.
+DAST findings cannot be uploaded to the GitHub Security tab. GitHub's code scanning API requires each vulnerability to reference a specific file and line number, which does not apply to web application vulnerabilities detected at runtime.
+
+To review DAST results, use the output file produced by the scanner. Set `output.format: SARIF` or `CSV` in your config file and read the file as a workflow artifact.
+
+### The scanner cannot reach the target URL
+
+The GitHub Actions runner must have network access to the URLs configured in `dast.urls`. Private or internal URLs require a self-hosted runner on the same network.
+
+### The pipeline fails unexpectedly
+
+If `strict: true` is set, the pipeline fails whenever vulnerabilities are found. Set `strict: false` to report findings without failing the pipeline.
+
+### The job fails with "not found in repository"
+
+The path provided to `scan_config_path` does not exist in the repository. Verify the path is correct and relative to the repository root.
 
 ## More information
 

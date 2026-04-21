@@ -6,6 +6,13 @@ branding:
   icon: 'shield'
   color: 'red'
 
+inputs:
+  scan_config_path:
+    description: >
+      Path to the YAML configuration file, relative to the repository root.
+      The job fails if the file does not exist at the given path.
+    required: true
+
 outputs:
   sarif_file:
     description: 'Path to SARIF results file (if SARIF format selected)'
@@ -20,5 +27,7 @@ runs:
     - name: Run scan
       id: scan
       shell: bash
+      env:
+        SCAN_CONFIG_PATH: ${{ inputs.scan_config_path }}
       run: |
         bash "${{ github.action_path }}/generate-config.sh"

@@ -2,13 +2,18 @@
 set -euo pipefail
 
 CONFIG_FILE="/tmp/dast-config.yaml"
-export FA_CONFIG="${GITHUB_WORKSPACE}/.fluidattacks.yaml"
+
+RESOLVED="${GITHUB_WORKSPACE}/${SCAN_CONFIG_PATH}"
+if [[ ! -f "${RESOLVED}" ]]; then
+  echo "::error::scan_config_path '${SCAN_CONFIG_PATH}' not found in repository"
+  exit 1
+fi
 
 prepare_config() {
   python3 -c "
 import yaml, os, sys
 
-fa_config_path = os.environ.get('FA_CONFIG', '')
+fa_config_path = os.path.join(os.environ['GITHUB_WORKSPACE'], os.environ['SCAN_CONFIG_PATH'])
 
 if os.path.isfile(fa_config_path):
     print(f'::notice::Reading config from {fa_config_path}')
@@ -30,7 +35,7 @@ if os.path.isfile(fa_config_path):
     with open('${CONFIG_FILE}', 'w') as f:
         yaml.dump(user_cfg, f, default_flow_style=False, sort_keys=False)
 else:
-    print(f'::notice::No config file found at {fa_config_path}. Exiting scanner')
+    print(f\"::error::scan_config_path '{os.environ['SCAN_CONFIG_PATH']}' not found in repository\")
     sys.exit(1)
 "
 }
