@@ -30,4 +30,5 @@ runs:
       env:
         SCAN_CONFIG_PATH: ${{ inputs.scan_config_path }}
       run: |
+        echo "Current branch: ${{ github.head_ref || github.ref_name }}"
         bash "${{ github.action_path }}/generate-config.sh"
