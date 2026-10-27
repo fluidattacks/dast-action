@@ -24,13 +24,14 @@ if os.path.isfile(fa_config_path):
     output_format = user_cfg.get('output',{}).get('format')
 
     if not (output_path and output_format):
-        output_path = '.fa-dast-results.sarif'
+        output_path = '.fluidattacks-dast-results.sarif'
         output_format = 'SARIF'
 
     cfg_output = {'format': output_format, 'file_path': output_path}
 
     user_cfg['output'] = cfg_output
-    user_cfg['namespace'] = os.environ['GITHUB_REPOSITORY']
+    if not user_cfg.get('namespace'):
+        user_cfg['namespace'] = os.environ['GITHUB_REPOSITORY'].split('/', 1)[-1]
 
     with open('${CONFIG_FILE}', 'w') as f:
         yaml.dump(user_cfg, f, default_flow_style=False, sort_keys=False)
