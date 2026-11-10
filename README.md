@@ -114,9 +114,12 @@ output:
 ```
 
 - **`language`** — language for vulnerability descriptions in the output (`EN` for English, `ES` for Spanish).
-- **`strict`** — when `false`, the scanner reports findings but does not fail the pipeline. Set to `true` to break the build on any detected vulnerability.
+- **`strict`** and **`strictness_threshold`** — control whether the scan breaks the build. See [Breaking the build](#breaking-the-build) for how they work and how the inputs of the same name interact with them.
 - **`output.file_path`** — path where results are written. When format is `SARIF`, this path is also exposed as the `sarif_file` action output.
 - **`output.format`** — `SARIF` produces the standard format. Use `CSV` for a spreadsheet-friendly report.
+
+`output.file_path` and `output.format` must be set together. The scanner decides what to do when only one is present (currently it fails).
+
 - **`dast.urls`** — list of URLs the scanner will probe. The target application must be running and reachable from the GitHub Actions runner.
 
 ## Action inputs
@@ -124,6 +127,41 @@ output:
 | Input | Required | Default | Description |
 |---|---|---|---|
 | `scan_config_path` | Yes | — | Path to the YAML configuration file, relative to the repository root. The job fails if the file does not exist at the given path. |
+| `strict` | No | — | `true` or `false`. Breaks the build when vulnerabilities are found. Overrides `strict` in the configuration file. When omitted, the configuration file decides. See [Breaking the build](#breaking-the-build). |
+| `strictness_threshold` | No | — | `low`, `medium`, `high` or `critical`. Breaks the build only for vulnerabilities at or above this severity. Overrides `strictness_threshold` in the configuration file. When omitted, the configuration file decides. See [Breaking the build](#breaking-the-build). |
+| `group` | No | — | Fluid Attacks group to authenticate as. Required only for OpenID Connect. See [Authentication](#authentication). |
+| `api_token` | No | — | Group token, used when OpenID Connect is not an option. Takes precedence over OIDC. See [Authentication](#authentication). |
+
+### Breaking the build
+
+By default the action reports vulnerabilities without failing the job. Two inputs make it fail, and you only need one of them.
+
+Fail on any vulnerability:
+
+```yaml
+- uses: fluidattacks/dast-action@<version>
+  id: scan
+  with:
+    strict: true
+```
+
+Fail only on vulnerabilities at or above a severity (`low`, `medium`, `high` or `critical`):
+
+```yaml
+- uses: fluidattacks/dast-action@<version>
+  id: scan
+  with:
+    strictness_threshold: high
+```
+
+`strictness_threshold` breaks the build by itself, with or without `strict`. The scan always reports every vulnerability and fails only on those that reach the threshold.
+
+How the decision is made:
+
+- **Unauthenticated runs:** `strict: true` breaks the build on any vulnerability, and `strictness_threshold` on those at or above that severity.
+- **Authenticated runs:** the minimum CVSS score defined in your group's platform policy also applies. When both a policy and `strictness_threshold` are present, the stricter of the two applies, so the workflow can only make the gate stricter than the platform, never looser.
+- **Precedence:** the inputs override `strict` and `strictness_threshold` in the configuration file, including `strict: false` over a file that says `true`. When an input is omitted, the file decides.
+- **Invalid values:** a value that is not `true`/`false` (for `strict`) or not one of `low`, `medium`, `high`, `critical` (for `strictness_threshold`, lowercase only) is ignored with a warning, so the configuration file decides.
 
 ## Action outputs
 
@@ -154,10 +192,13 @@ Point the URL in your config file to a staging environment that is deployed as p
 
 ### Strict mode: block merges with vulnerabilities
 
-Set `strict: true` in your configuration file and enable **Require status checks to pass before merging** in your repository's branch protection settings.
+Set `strict: true` to fail on any vulnerability, or `strictness_threshold` to fail only from a severity up (as an action input or in your configuration file), and enable **Require status checks to pass before merging** in your repository's branch protection settings:
 
 ```yaml
-strict: true
+- uses: fluidattacks/dast-action@<version>
+  with:
+    scan_config_path: .github/dast-config.yaml
+    strictness_threshold: high
 ```
 
 ### Export results as CSV
@@ -182,7 +223,7 @@ The GitHub Actions runner must have network access to the URLs configured in `da
 
 ### The pipeline fails unexpectedly
 
-If `strict: true` is set, the pipeline fails whenever vulnerabilities are found. Set `strict: false` to report findings without failing the pipeline.
+If `strict: true` or a `strictness_threshold` is set (as an action input or in your configuration file), the pipeline fails when the scan finds vulnerabilities, or ones at or above the threshold. This is intentional. Remove them, or raise `strictness_threshold`, if you want the scan to report vulnerabilities without failing the pipeline. The action input wins over the configuration file.
 
 ### The job fails with "not found in repository"
 
