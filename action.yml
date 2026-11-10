@@ -18,8 +18,7 @@ inputs:
       Required only for OpenID Connect; not needed with "api_token", which
       already identifies the group. With OpenID Connect, grant the job
       "permissions: id-token: write" and define a trust for the repository.
-      When empty, or when credentials are unavailable, the scan runs
-      unauthenticated.
+      When credentials are unavailable, the scan runs unauthenticated.
     required: false
     default: ''
   api_token:
@@ -28,26 +27,29 @@ inputs:
       secret. Takes precedence over OIDC. Does not require the "group" input.
     required: false
     default: ''
+  strict:
+    description: >
+      Break the build when vulnerabilities are found. On authenticated runs the
+      platform's minimum CVSS score applies, otherwise any vulnerability
+      breaks. Overrides "strict" in the config file. When empty, the config
+      file decides.
+    required: false
+    default: ''
+  strictness_threshold:
+    description: >
+      Break the build only for vulnerabilities at or above this severity: low,
+      medium, high or critical. Combined with the platform severity policy,
+      the strictest of the two applies. Overrides the config file. When empty,
+      the config file decides.
+    required: false
+    default: ''
 
 outputs:
   sarif_file:
     description: 'Path to SARIF results file (if SARIF format selected)'
-    value: ${{ steps.scan.outputs.sarif_file }}
   vulnerabilities_found:
     description: 'Whether vulnerabilities were found (true/false)'
-    value: ${{ steps.scan.outputs.vulnerabilities_found }}
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Run scan
-      id: scan
-      shell: bash
-      env:
-        CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
-        SCAN_CONFIG_PATH: ${{ inputs.scan_config_path }}
-        FLUID_GROUP: ${{ inputs.group }}
-        INTEGRATES_API_TOKEN: ${{ inputs.api_token }}
-      run: |
-        echo "Current branch: ${CURRENT_BRANCH}"
-        bash "${{ github.action_path }}/generate-config.sh"
+  using: 'node24'
+  main: 'dist/index.js'
